@@ -1,6 +1,7 @@
 use crate::types::{DkgShares, RefreshShares};
 use generic_ec::{Point, Scalar, SecretScalar, curves::Secp256k1};
 use rand_core::{CryptoRng, RngCore};
+use sha2::{Digest, Sha256};
 
 /// This function is used to generate shares and it can be passed SecretScalar intercept value
 /// which decides if the shares are RefreshShares or DkgShares
@@ -55,6 +56,49 @@ pub fn generate_refresh_shares<R: RngCore + CryptoRng>(
     rng: &mut R,
 ) -> RefreshShares {
     generate_shares_internal(SecretScalar::zero(), t, n, rng)
+}
+
+pub fn evaluate_polynomial(
+    intercept: SecretScalar<Secp256k1>,
+    t: u16,
+    n: u16,
+) -> (Vec<Point<Secp256k1>>, Vec<SecretScalar<Secp256k1>>) {
+    let mut coeffs = vec![intercept];
+    for _ in 1..t {
+        coeffs.push(SecretScalar::random(&mut rand_core::OsRng));
+    }
+
+    let commitments: Vec<Point<Secp256k1>> =
+        coeffs.iter().map(|a| Point::generator() * a).collect();
+
+    let mut secret_shares = Vec::with_capacity(n as usize);
+    for j in 0..n {
+        let x = Scalar::<Secp256k1>::from(j + 1);
+        let mut share = Scalar::<Secp256k1>::zero();
+        let mut x_pow = Scalar::<Secp256k1>::one();
+        for a in &coeffs {
+            share += a.as_ref() * x_pow;
+            x_pow *= &x;
+        }
+        secret_shares.push(SecretScalar::new(&mut share));
+    }
+
+    (commitments, secret_shares)
+}
+
+pub fn compute_commitment(
+    sid: &[u8],
+    party_index: u16,
+    commitments: &[Point<Secp256k1>],
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"govis-dkg-commit");
+    hasher.update(sid);
+    hasher.update(party_index.to_be_bytes());
+    for point in commitments {
+        hasher.update(point.to_bytes(true).as_bytes());
+    }
+    hasher.finalize().into()
 }
 
 /// It takes the received_offsets and using that updates the old_share
