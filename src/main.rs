@@ -13,12 +13,14 @@ async fn main() {
         Some(s) => s.parse().expect("invalid --index"),
         None => {
             eprintln!(
-                "Usage: {} --index <i> --addrs <host:port,...> [--protocol <lindell|cggmp21>] [--threshold <t>] [--signers <i,j,...>] [--sid <id>] [--sign <hex> | --file <path>]",
+                "Usage: {} --index <i> --addrs <host:port,...> [--protocol <lindell|cggmp21>] [--threshold <t>] [--signers <i,j,...>] [--sid <id>] [--sign <hex> | --file <path>] [--refresh --old-share <hex> --master-pk <hex>]",
                 args[0]
             );
             std::process::exit(1);
         }
     };
+
+    let do_refresh = get_arg(&args, "--refresh").is_some();
 
     let addrs_str = get_arg(&args, "--addrs").expect("missing --addrs <host:port,host:port,...>");
 
@@ -48,6 +50,17 @@ async fn main() {
     };
 
     let sid = get_arg(&args, "--sid").unwrap_or("dkg-session");
+
+    if do_refresh {
+        if protocol == "cggmp21" {
+            eprintln!(
+                "Error: --refresh is not yet supported for CGGMP21. Use --protocol lindell or omit --refresh."
+            );
+            std::process::exit(1);
+        }
+        run_refresh_cli(my_index, n, threshold, &addrs, sid, &args).await;
+        return;
+    }
 
     eprintln!("Party {my_index}/{n}: connecting (protocol={protocol}, threshold={threshold})...");
 
@@ -270,6 +283,64 @@ fn print_signature(
     // Bitcoin DER format
     let btc_sig = sign::bitcoin_der_signature(r_bytes, s_bytes);
     println!("Bitcoin DER: {}", hex::encode(&btc_sig));
+}
+
+async fn run_refresh_cli(
+    my_index: u16,
+    n: u16,
+    threshold: u16,
+    addrs: &[SocketAddr],
+    sid: &str,
+    args: &[String],
+) {
+    let old_share_hex = get_arg(args, "--old-share").expect("--refresh requires --old-share <hex>");
+    let master_pk_hex = get_arg(args, "--master-pk").expect("--refresh requires --master-pk <hex>");
+
+    let old_share_bytes = hex::decode(old_share_hex).expect("invalid hex in --old-share");
+    let old_share = generic_ec::SecretScalar::<generic_ec::curves::Secp256k1>::new(
+        &mut generic_ec::Scalar::<generic_ec::curves::Secp256k1>::from_be_bytes_mod_order(
+            &old_share_bytes,
+        ),
+    );
+
+    let master_pk_bytes = hex::decode(master_pk_hex).expect("invalid hex in --master-pk");
+    let master_pk =
+        generic_ec::Point::<generic_ec::curves::Secp256k1>::from_bytes(&master_pk_bytes)
+            .expect("invalid point in --master-pk");
+
+    let delivery = govis::tcp_delivery::connect_tcp(my_index, addrs)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Connection failed: {e}");
+            std::process::exit(1);
+        });
+
+    eprintln!("Party {my_index}: connected, running key refresh...");
+    let party = round_based::mpc::connected(delivery);
+    let output = govis::run_refresh(
+        party,
+        my_index,
+        n,
+        threshold,
+        sid.as_bytes(),
+        &old_share,
+        master_pk,
+    )
+    .await
+    .unwrap_or_else(|e| {
+        eprintln!("Key refresh failed: {e:?}");
+        std::process::exit(1);
+    });
+
+    println!("=== Party {my_index} Key Refresh Result ===");
+    println!(
+        "New secret share: {}",
+        hex::encode(output.secret_share.as_ref().to_be_bytes())
+    );
+    println!(
+        "Master public key: {}",
+        hex::encode(master_pk.to_bytes(true))
+    );
 }
 
 fn resolve_digest(args: &[String]) -> Option<[u8; 32]> {

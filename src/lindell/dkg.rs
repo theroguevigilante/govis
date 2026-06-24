@@ -240,4 +240,52 @@ pub mod tests {
             );
         }
     }
+
+    #[test]
+    fn refresh_via_hex_roundtrip() {
+        let (t, n) = (2, 3);
+
+        let initial = run_dkg_sync(t, n);
+        let pk_initial = initial[0].public_key;
+
+        // Simulate CLI hex serialization
+        let old_share_hex = hex::encode(initial[0].secret_share.as_ref().to_be_bytes());
+        let master_pk_hex = hex::encode(pk_initial.to_bytes(true));
+
+        // Simulate CLI hex deserialization (as run_refresh_cli does)
+        let old_share_bytes = hex::decode(&old_share_hex).unwrap();
+        let old_share = generic_ec::SecretScalar::<generic_ec::curves::Secp256k1>::new(
+            &mut generic_ec::Scalar::<generic_ec::curves::Secp256k1>::from_be_bytes_mod_order(
+                &old_share_bytes,
+            ),
+        );
+        let master_pk_bytes = hex::decode(&master_pk_hex).unwrap();
+        let master_pk =
+            generic_ec::Point::<generic_ec::curves::Secp256k1>::from_bytes(&master_pk_bytes)
+                .unwrap();
+
+        assert_eq!(master_pk, pk_initial, "master pk roundtrip");
+        assert_eq!(
+            *old_share.as_ref(),
+            *initial[0].secret_share.as_ref(),
+            "old share roundtrip"
+        );
+
+        let sid = b"test-refresh-hex";
+        let old_shares = vec![old_share; n as usize];
+
+        let result = round_based::sim::run_with_setup(old_shares, |i, party, share| async move {
+            run_refresh(party, i, n, t, sid, &share, master_pk).await
+        })
+        .unwrap()
+        .expect_ok()
+        .into_vec();
+
+        for out in &result {
+            assert_eq!(
+                out.public_key, pk_initial,
+                "public key must stay same after hex roundtrip refresh"
+            );
+        }
+    }
 }

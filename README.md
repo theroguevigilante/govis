@@ -8,7 +8,7 @@ Threshold cryptography library in Rust implementing **CGGMP21** (t-of-n) and **L
 - [x] CGGMP21 t-of-n keygen, presign, online sign
 - [x] Paillier encryption & ZK proofs (range, consistency, log, Schnorr, Blum)
 - [x] TCP multi-party networking (`tcp_delivery`)
-- [x] CLI: `--index`, `--addrs`, `--protocol`, `--threshold`, `--signers`, `--sid`, `--sign`/`--file`
+- [x] CLI: `--index`, `--addrs`, `--protocol`, `--threshold`, `--signers`, `--sid`, `--sign`/`--file`, `--refresh`
 - [x] 35 unit tests (simulated MPC, all thresholds)
 - [x] Deterministic RNG via `TestRng` for reproducible tests
 
@@ -37,6 +37,9 @@ govis --index 0 --addrs 127.0.0.1:{9000..9004} --protocol cggmp21 --threshold 2 
 
 # Sign a file (SHA256 digest)
 govis --index 0 --addrs ... --file <path>
+
+# Key refresh (Lindell)
+govis --index 0 --addrs 127.0.0.1:9000,127.0.0.1:9001 --refresh --old-share <hex> --master-pk <hex>
 ```
 
 ## Tests
