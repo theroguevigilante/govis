@@ -14,9 +14,16 @@ use crate::paillier_zk;
 
 #[derive(ProtocolMsg, Clone, Debug, Serialize, Deserialize)]
 pub enum PresignMsg {
+    Round0(PaillierPKMsg),
     Round1(CommitMsg),
     Round2(RevealMsg),
     Round3(EncryptedKMsg),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaillierPKMsg {
+    pub n: BigUint,
+    pub g: BigUint,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -73,6 +80,8 @@ fn secp256k1_order() -> BigUint {
 
 #[derive(Debug)]
 pub enum Error<RecvErr, SendErr> {
+    Round0Send(SendErr),
+    Round0Receive(RecvErr),
     Round1Send(SendErr),
     Round1Receive(RecvErr),
     Round2Send(SendErr),
@@ -91,9 +100,6 @@ pub async fn run_presign<M, R>(
     i: u16,
     signers: &[u16],
     _ec_share: &SecretScalar<Secp256k1>,
-    peer_paillier_pks: &[Option<paillier::PaillierPublicKey>],
-    my_paillier_sk: &paillier::PaillierPrivateKey,
-    my_paillier_pk: &paillier::PaillierPublicKey,
     mut rng: R,
 ) -> Result<Presignature, ErrorM<M>>
 where
@@ -106,10 +112,35 @@ where
         .ok_or(Error::ProtocolViolation("party not in signer set"))? as u16;
     let m = signers.len() as u16;
 
+    let round0 = mpc.add_round(RoundInput::<PaillierPKMsg>::reliable_broadcast(local_i, m));
     let round1 = mpc.add_round(RoundInput::<CommitMsg>::reliable_broadcast(local_i, m));
     let round2 = mpc.add_round(RoundInput::<RevealMsg>::reliable_broadcast(local_i, m));
     let round3 = mpc.add_round(RoundInput::<EncryptedKMsg>::p2p(local_i, m));
     let mut mpc = mpc.finish_setup();
+
+    // Round 0: Exchange fresh Paillier public keys
+    let kp = paillier::generate_keypair(crate::lindell::sign::PAILLIER_BITS);
+
+    mpc.reliably_broadcast(PresignMsg::Round0(PaillierPKMsg {
+        n: kp.pk.n.clone(),
+        g: kp.pk.g.clone(),
+    }))
+    .await
+    .map_err(Error::Round0Send)?;
+
+    let round0_msgs = mpc.complete(round0).await.map_err(Error::Round0Receive)?;
+
+    let mut peer_paillier_pks: Vec<Option<paillier::PaillierPublicKey>> =
+        (0..m).map(|_| None).collect();
+    for (sender_local, _, msg0) in round0_msgs.iter_indexed() {
+        if sender_local != local_i {
+            peer_paillier_pks[usize::from(sender_local)] = Some(paillier::PaillierPublicKey {
+                n: msg0.n.clone(),
+                n_sq: msg0.n.pow(2u32),
+                g: msg0.g.clone(),
+            });
+        }
+    }
 
     // Round 1: Commit to nonce share R_i = k_i·G
     let k_scalar = Scalar::<Secp256k1>::random(&mut rng);
@@ -167,12 +198,11 @@ where
     let order = BigInt::from_biguint(num_bigint::Sign::Plus, secp256k1_order());
 
     let mut send_many = mpc.send_many();
-    for (local_peer, &peer) in signers.iter().enumerate() {
-        let local_peer = local_peer as u16;
+    for local_peer in 0..m {
         if local_peer == local_i {
             continue;
         }
-        if let Some(ref pk) = peer_paillier_pks[usize::from(peer)] {
+        if let Some(ref pk) = peer_paillier_pks[usize::from(local_peer)] {
             let n_bi = BigInt::from_biguint(num_bigint::Sign::Plus, pk.n.clone());
             let rho = rng.gen_bigint_range(&BigInt::from(1), &n_bi);
             let c_k_enc = pk.encrypt_with_rho(&k_bi, &rho);
@@ -208,7 +238,7 @@ where
             continue;
         }
         if let Some(c_k_share) = &msg3.c_k_share {
-            let plaintext = my_paillier_sk.decrypt(my_paillier_pk, c_k_share);
+            let plaintext = kp.sk.decrypt(&kp.pk, c_k_share);
             k_bi_total = (&k_bi_total + &plaintext).mod_floor(&order);
         }
     }
