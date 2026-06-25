@@ -2,9 +2,10 @@ use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_integer::Integer;
 use num_primes::Generator;
 use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 
 /// Paillier public key
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPublicKey {
     pub n: BigUint,
     pub n_sq: BigUint,
@@ -12,7 +13,7 @@ pub struct PaillierPublicKey {
 }
 
 /// Paillier private key
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPrivateKey {
     pub lambda: BigUint,
     pub mu: BigUint,
