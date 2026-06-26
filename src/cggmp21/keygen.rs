@@ -69,7 +69,7 @@ where
     let mut mpc = mpc.finish_setup();
 
     // Generate Paillier key + Blum proof
-    let (p, q, kp) = paillier::generate_keypair_ext(crate::lindell::sign::PAILLIER_BITS);
+    let (p, q, kp) = paillier::generate_keypair_ext(crate::lindell::sign::paillier_bits());
     let pk1 = kp.pk;
     let sk1 = kp.sk;
     let n_bi = BigInt::from_biguint(num_bigint::Sign::Plus, pk1.n.clone());

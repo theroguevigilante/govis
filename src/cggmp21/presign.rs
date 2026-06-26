@@ -119,7 +119,7 @@ where
     let mut mpc = mpc.finish_setup();
 
     // Round 0: Exchange fresh Paillier public keys
-    let kp = paillier::generate_keypair(crate::lindell::sign::PAILLIER_BITS);
+    let kp = paillier::generate_keypair(crate::lindell::sign::paillier_bits());
 
     mpc.reliably_broadcast(PresignMsg::Round0(PaillierPKMsg {
         n: kp.pk.n.clone(),

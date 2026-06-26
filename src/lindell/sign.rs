@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::paillier;
 use crate::paillier_zk;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn scalar_to_bigint(s: &Scalar<Secp256k1>) -> BigInt {
     let encoded = s.to_be_bytes();
@@ -106,12 +107,20 @@ pub fn bitcoin_der_signature(r_bytes: &[u8], s_bytes: &[u8]) -> Vec<u8> {
     sig
 }
 
-const CURVE_BITS: usize = 256;
-
 #[cfg(not(test))]
-pub const PAILLIER_BITS: usize = 2048;
+static PAILLIER_BITS: AtomicUsize = AtomicUsize::new(2048);
 #[cfg(test)]
-pub const PAILLIER_BITS: usize = 1024;
+static PAILLIER_BITS: AtomicUsize = AtomicUsize::new(1024);
+
+pub fn paillier_bits() -> usize {
+    PAILLIER_BITS.load(Ordering::Relaxed)
+}
+
+pub fn set_paillier_bits(bits: usize) {
+    PAILLIER_BITS.store(bits, Ordering::Relaxed);
+}
+
+const CURVE_BITS: usize = 256;
 
 #[derive(ProtocolMsg, Clone, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
@@ -219,7 +228,7 @@ where
     // Round 1: P1 broadcasts Paillier pk + encrypted nonce + ZK proofs
     let mut p1_state: Option<P1State> = None;
     if is_p1 {
-        let kp = paillier::generate_keypair(PAILLIER_BITS);
+        let kp = paillier::generate_keypair(paillier_bits());
         let k = Scalar::<Secp256k1>::random(rng);
         let k_inv = k.invert().expect("k is zero (astronomically unlikely)");
         let r_point = Point::generator() * k;
