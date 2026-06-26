@@ -15,7 +15,7 @@ async fn main() {
         Some(s) => s.parse().expect("invalid --index"),
         None => {
             eprintln!(
-                "Usage: {} --index <i> --addrs <host:port,...> [--protocol <lindell|cggmp21>] [--threshold <t>] [--signers <i,j,...>] [--sid <id>] [--sign <hex> | --file <path>] [--refresh --old-share <hex> --master-pk <hex>] [--save-key <file>] [--load-key <file>]",
+                "Usage: {} --index <i> --addrs <host:port,...> [--protocol <lindell|cggmp21>] [--threshold <t>] [--signers <i,j,...>] [--sid <id>] [--sign <hex> | --file <path>] [--refresh --old-share <hex> --master-pk <hex>] [--save-key <file>] [--load-key <file>] [--paillier-bits <bits>]",
                 args[0]
             );
             std::process::exit(1);
@@ -41,23 +41,69 @@ async fn main() {
 
     let n = addrs.len() as u16;
 
+    let protocol = get_arg(&args, "--protocol").unwrap_or("lindell");
+
     let threshold: u16 = match get_arg(&args, "--threshold") {
-        Some(s) => s.parse().expect("invalid --threshold"),
+        Some(s) => {
+            let t: u16 = s.parse().expect("invalid --threshold");
+            if protocol == "lindell" {
+                if t != 2 {
+                    eprintln!("Error: Lindell protocol requires threshold 2, got {t}");
+                    std::process::exit(1);
+                }
+                eprintln!("Note: --threshold is ignored for Lindell (always 2)");
+            }
+            t
+        }
         None => {
-            let f = (n - 1) / 3;
-            2 * f + 1
+            if protocol == "lindell" {
+                2
+            } else {
+                let f = (n - 1) / 3;
+                2 * f + 1
+            }
         }
     };
 
-    let protocol = get_arg(&args, "--protocol").unwrap_or("lindell");
+    if let Some(bits_str) = get_arg(&args, "--paillier-bits") {
+        let bits: usize = bits_str.parse().expect("invalid --paillier-bits");
+        sign::set_paillier_bits(bits);
+        eprintln!("Using Paillier modulus size: {bits} bits");
+    }
 
     let signers: Vec<u16> = match get_arg(&args, "--signers") {
         Some(s) => s
             .split(',')
             .map(|x| x.parse().expect("invalid signer index"))
             .collect(),
-        None => vec![0u16, 1u16],
+        None => {
+            if protocol == "lindell" {
+                vec![0u16, 1u16]
+            } else {
+                (0..threshold).collect()
+            }
+        }
     };
+
+    if protocol == "cggmp21" && signers.len() < threshold as usize {
+        eprintln!(
+            "Error: CGGMP21 requires at least --threshold ({threshold}) signers, got {}",
+            signers.len()
+        );
+        std::process::exit(1);
+    }
+
+    if threshold > n {
+        eprintln!(
+            "Error: --threshold ({threshold}) cannot exceed the number of parties ({n})"
+        );
+        std::process::exit(1);
+    }
+
+    if let Some(&s) = signers.iter().find(|&&s| s >= n) {
+        eprintln!("Error: signer index {s} is out of range (max index is {})", n - 1);
+        std::process::exit(1);
+    }
 
     let sid = get_arg(&args, "--sid").unwrap_or("dkg-session");
 
