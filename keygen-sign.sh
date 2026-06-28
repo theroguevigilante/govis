@@ -32,7 +32,6 @@ EOF
 
 if [ $# -eq 0 ]; then usage; fi
 
-# Parse args
 ADDRS=""
 THRESHOLD=""
 PROTOCOL="lindell"
@@ -65,7 +64,6 @@ if [ -z "$ADDRS" ]; then
     usage
 fi
 
-# Parse addresses
 IFS=',' read -ra ADDR_ARRAY <<< "$ADDRS"
 N=${#ADDR_ARRAY[@]}
 
@@ -74,7 +72,6 @@ if [ -z "$THRESHOLD" ]; then
     THRESHOLD=$(( 2 * F + 1 ))
 fi
 
-# Resolve signers
 if [ -z "$SIGNERS" ]; then
     if [ "$PROTOCOL" = "cggmp21" ]; then
         # CGGMP21: all parties participate in signing
@@ -89,7 +86,6 @@ if [ -z "$SIGN_HEX" ]; then
     echo "Using random digest: 0x$SIGN_HEX"
 fi
 
-# Create output directory
 if [ -z "$OUTDIR" ]; then
     OUTDIR=$(mktemp -d)
     CLEANUP_DIR=true
@@ -109,7 +105,6 @@ echo "=============================="
 cleanup() {
     echo ""
     echo "Cleaning up..."
-    # Kill any remaining background processes
     jobs -p 2>/dev/null | xargs -r kill 2>/dev/null || true
     wait 2>/dev/null || true
     if [ "$CLEANUP_DIR" = true ] && [ "$KEEP_KEYS" = false ]; then
@@ -159,7 +154,6 @@ if [ "$FAILED" = true ]; then
     exit 1
 fi
 
-# Display public keys
 echo ""
 echo "Public keys:"
 for i in $(seq 0 $((N - 1))); do
@@ -168,7 +162,6 @@ for i in $(seq 0 $((N - 1))); do
     echo "  Party $i: $PUBKEY"
 done
 
-# Display secret shares
 echo ""
 echo "Secret shares:"
 for i in $(seq 0 $((N - 1))); do
@@ -219,8 +212,7 @@ if [ "$DO_REFRESH" = true ]; then
         exit 1
     fi
 
-    # Display new shares
-    echo ""
+    echo "Refreshed secret shares:"
     echo "Refreshed secret shares:"
     for i in $(seq 0 $((N - 1))); do
         LOG_FILE="$OUTDIR/party_${i}_refresh.log"
@@ -229,7 +221,6 @@ if [ "$DO_REFRESH" = true ]; then
     done
 fi
 
-# Use refreshed keys for signing if available, else original keys
 SIGN_KEY_FILES=("${KEY_FILES[@]}")
 if [ "$DO_REFRESH" = true ]; then
     SIGN_KEY_FILES=("${REFRESHED_FILES[@]}")
@@ -239,8 +230,6 @@ fi
 echo ""
 echo "=== Phase 3: Sign (digest: 0x$SIGN_HEX) ==="
 echo ""
-
-PID_LIST=()
 
 PID_LIST=()
 for i in $(seq 0 $((N - 1))); do
@@ -278,7 +267,6 @@ if [ "$FAILED" = true ]; then
     exit 1
 fi
 
-# Display signature
 echo ""
 echo "=== Signature ==="
 for i in $(seq 0 $((N - 1))); do

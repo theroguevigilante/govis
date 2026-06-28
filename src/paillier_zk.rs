@@ -101,11 +101,9 @@ pub fn verify_range(
 
     let e = range_challenge(sid, &pk.n, &pk.g, ell, c, &proof.c_alpha);
 
-    // lhs = c_α * c^e mod N^2
     let c_e = c.modpow(&e, &n_sq);
     let lhs = (&proof.c_alpha * &c_e) % &n_sq;
 
-    // rhs = (1 + z*N) * s^N mod N^2
     let g_z = g_pow(&proof.z, &n, &n_sq);
     let s_n = proof.s.modpow(&n, &n_sq);
     let rhs = (g_z * s_n) % &n_sq;
@@ -113,11 +111,6 @@ pub fn verify_range(
     lhs == rhs
 }
 
-// ─── Blum integer proof (Π_blum) ───
-// Proves N is a Blum integer: N = p*q with p,q distinct primes, p ≡ q ≡ 3 mod 4.
-// Uses the fact that for a Blum integer, exactly one of {c, -c} is a quadratic
-// residue modulo N for any random c ∈ Z_N^*. The prover demonstrates knowledge
-// of the factors by computing square roots of challenge values.
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlumProof {
@@ -159,12 +152,12 @@ pub fn prove_blum(p: &BigInt, q: &BigInt, n: &BigInt, sid: &[u8]) -> BlumProof {
         let c = blum_challenge(sid, &n.to_biguint().unwrap(), i);
         let c_mod_n = c.mod_floor(n);
 
-        // Check if c is QR mod N: must be QR mod p AND QR mod q
+        // Check if c is QR mod N
         let c_qr_p = is_quadratic_residue_mod_prime(&c_mod_n, p);
         let c_qr_q = is_quadratic_residue_mod_prime(&c_mod_n, q);
 
         if c_qr_p && c_qr_q {
-            // c is QR mod N: compute sqrt mod p and sqrt mod q, combine via CRT
+            // c is QR mod N
             let sqrt_p = sqrt_mod_prime(&c_mod_n, p);
             let sqrt_q = sqrt_mod_prime(&c_mod_n, q);
             let root = crt(&sqrt_p, p, &sqrt_q, q, n);
@@ -172,7 +165,6 @@ pub fn prove_blum(p: &BigInt, q: &BigInt, n: &BigInt, sid: &[u8]) -> BlumProof {
             bits.push(true);
             roots.push(root);
         } else {
-            // Try -c
             let neg_c = n - &c_mod_n;
             let neg_qr_p = is_quadratic_residue_mod_prime(&neg_c, p);
             let neg_qr_q = is_quadratic_residue_mod_prime(&neg_c, q);
@@ -185,8 +177,6 @@ pub fn prove_blum(p: &BigInt, q: &BigInt, n: &BigInt, sid: &[u8]) -> BlumProof {
                 bits.push(false);
                 roots.push(root);
             }
-            // If neither works (c has different Legendre symbols mod p and mod q),
-            // skip this challenge.
         }
     }
 
@@ -201,7 +191,6 @@ pub fn prove_blum(p: &BigInt, q: &BigInt, n: &BigInt, sid: &[u8]) -> BlumProof {
 pub fn verify_blum(n: &BigUint, sid: &[u8], proof: &BlumProof) -> bool {
     let n_bi = BigInt::from_biguint(num_bigint::Sign::Plus, n.clone());
 
-    // Public checks: N must be odd, N ≡ 1 mod 4
     if !n_bi.bit(0) {
         return false;
     }
@@ -219,11 +208,9 @@ pub fn verify_blum(n: &BigUint, sid: &[u8], proof: &BlumProof) -> bool {
         let c = blum_challenge(sid, n, *cidx);
         let c_mod = c.mod_floor(&n_bi);
 
-        // Compute expected: root^2 ≡ ±c (mod N)
         let expected = if *bit { c_mod } else { &n_bi - c_mod };
         let expected = expected.mod_floor(&n_bi);
 
-        // Check root^2 ≡ expected (mod N)
         let root_sq = root.modpow(&BigInt::from(2u64), &n_bi);
 
         if root_sq == expected {
@@ -231,13 +218,10 @@ pub fn verify_blum(n: &BigUint, sid: &[u8], proof: &BlumProof) -> bool {
         }
     }
 
-    // Need all entries to pass
     valid_count > 0 && valid_count == proof.bits.len()
 }
 
 fn crt(a: &BigInt, p: &BigInt, b: &BigInt, q: &BigInt, n: &BigInt) -> BigInt {
-    // Solve x ≡ a (mod p), x ≡ b (mod q)
-    // x = a + p * ((b-a) * p^(-1) mod q)
     let diff = (b - a).mod_floor(n);
     let p_inv_q = modinv_internal(p.clone(), q);
     let t = (diff * &p_inv_q).mod_floor(q);
@@ -260,7 +244,6 @@ fn modinv_internal(a: BigInt, m: &BigInt) -> BigInt {
     if t < BigInt::zero() { t + m } else { t }
 }
 
-// ─── Multiplication proof (P2 proves c_s2 = c_k_inv^(r·x₂) · Enc(0)) ───
 
 /// Proves that c_out = c_in^(scalar) · Enc(0) where scalar corresponds to a known EC point contribution.
 /// Public: c_in, c_out, pk, R_peer_x (the x-coordinate of the peer's public contribution)
@@ -321,7 +304,6 @@ pub fn prove_mul(
     let t = rng.gen_bigint_range(&BigInt::zero(), &(BigInt::from(1) << t_bits));
     let rho_t = rng.gen_bigint_range(&BigInt::from(1), &n);
 
-    // c_t = c_in^t · Enc(0) mod N^2 = c_in^t · rho_t^N mod N^2
     let c_in_t = c_in.modpow(&t, &n_sq);
     let enc_zero = rho_t.modpow(&n, &n_sq);
     let c_t = (c_in_t * enc_zero) % &n_sq;
@@ -356,29 +338,12 @@ pub fn verify_mul(
 
     let e = mul_challenge(sid, &pk.n, &pk.g, c_in, c_out, &proof.c_t);
 
-    // lhs = c_t * c_out^e mod N^2
     let c_out_e = c_out.modpow(&e, &n_sq);
     let lhs = (&proof.c_t * &c_out_e) % &n_sq;
 
-    // rhs = c_in^z * s_response^N mod N^2
     let c_in_z = c_in.modpow(&proof.z, &n_sq);
     let s_n = proof.s_response.modpow(&n, &n_sq);
     let rhs = (c_in_z * s_n) % &n_sq;
-
-    // Also need: rhs should equal Enc(z * scalar_inner + 0 * e)
-    // Wait, let me re-derive. The protocol proves:
-    // P2 knows scalar, rho_out such that c_out = c_in^scalar * rho_out^N mod N^2
-    //
-    // Commitment: c_t = c_in^t * rho_t^N mod N^2 (t is random, rho_t is random)
-    // Response: z = t + e * scalar
-    //          s = rho_t * rho_out^e mod N
-    //
-    // Check: c_t * c_out^e ≡ c_in^t * rho_t^N * (c_in^scalar * rho_out^N)^e
-    //        ≡ c_in^(t+e*scalar) * (rho_t * rho_out^e)^N
-    //        ≡ c_in^z * s^N (mod N^2) ✓
-    //
-    // This is sound: if |scalar| < 2^bound, and |z| < 2^(bound + sec + n_bit),
-    // then with high probability the prover knows scalar.
 
     lhs == rhs
 }

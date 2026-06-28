@@ -237,7 +237,6 @@ mod tests {
             assert_eq!(out.public_key, pub_key, "pub_key mismatch at {}", idx);
         }
 
-        // Filter keygen outputs to the signing subset
         let signer_kgen: Vec<Cggmp21KeygenOutput> = signers
             .iter()
             .map(|&s| keygen_outputs[s as usize].clone())

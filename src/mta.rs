@@ -22,7 +22,6 @@ pub struct MtaRound2Msg {
     pub nosmall_proof: paillier_zk::RangeProof,
 }
 
-/// Party j's output after finalizing MtA.
 pub struct MtaResult {
     pub beta: Scalar<Secp256k1>,
 }

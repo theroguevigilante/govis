@@ -118,7 +118,6 @@ where
     let round3 = mpc.add_round(RoundInput::<EncryptedKMsg>::p2p(local_i, m));
     let mut mpc = mpc.finish_setup();
 
-    // Round 0: Exchange fresh Paillier public keys
     let kp = paillier::generate_keypair(crate::lindell::sign::paillier_bits());
 
     mpc.reliably_broadcast(PresignMsg::Round0(PaillierPKMsg {
@@ -142,7 +141,6 @@ where
         }
     }
 
-    // Round 1: Commit to nonce share R_i = k_i·G
     let k_scalar = Scalar::<Secp256k1>::random(&mut rng);
     let r_point_share = Point::generator() * k_scalar;
 
@@ -160,7 +158,6 @@ where
 
     let round1_msgs = mpc.complete(round1).await.map_err(Error::Round1Receive)?;
 
-    // Round 2: Open commitment, verify, compute R
     mpc.reliably_broadcast(PresignMsg::Round2(RevealMsg {
         r_point: r_point_share,
     }))
@@ -193,7 +190,6 @@ where
 
     let r = point_x_coord(&r_point_total);
 
-    // Round 3: Send encrypted k_i under each signer's Paillier key (P2P)
     let k_bi = mta::scalar_to_bigint(&k_scalar);
     let order = BigInt::from_biguint(num_bigint::Sign::Plus, secp256k1_order());
 

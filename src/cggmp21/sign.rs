@@ -63,7 +63,6 @@ where
     let round1 = mpc.add_round(RoundInput::<SignatureShareMsg>::p2p(local_i, m));
     let mut mpc = mpc.finish_setup();
 
-    // s_i = k⁻¹ · λ_i · (m + r · x_i)
     let lambda = lagrange_coeff(i, signers);
     let msg = Scalar::<Secp256k1>::from_be_bytes_mod_order(msg_digest);
     let s_i = presig.k_inv * lambda * (msg + presig.r * ec_share.as_ref());
@@ -85,7 +84,6 @@ where
 
     let round1_msgs = mpc.complete(round1).await.map_err(Error::Round1Receive)?;
 
-    // s = Σ s_j (this party's s_i + received peer shares)
     let mut s_total = s_i;
     for (sender_local, _, msg1) in round1_msgs.iter_indexed() {
         if sender_local == local_i {

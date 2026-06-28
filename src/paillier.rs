@@ -4,7 +4,6 @@ use num_primes::Generator;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
-/// Paillier public key
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPublicKey {
     pub n: BigUint,
@@ -12,14 +11,12 @@ pub struct PaillierPublicKey {
     pub g: BigUint,
 }
 
-/// Paillier private key
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPrivateKey {
     pub lambda: BigUint,
     pub mu: BigUint,
 }
 
-/// Paillier keypair
 pub struct PaillierKeypair {
     pub pk: PaillierPublicKey,
     pub sk: PaillierPrivateKey,

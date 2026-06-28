@@ -294,7 +294,6 @@ async fn run_cggmp21(
         eprintln!("Party {my_index}: saved key to {path}");
     }
 
-    // Phase 2: Presign (if --sign or --file is provided)
     if let Some(msg_digest) = resolve_digest(args) {
         eprintln!("Party {my_index}: running presign...");
 
@@ -319,7 +318,6 @@ async fn run_cggmp21(
             std::process::exit(1);
         });
 
-        // Phase 3: Online sign
         eprintln!("Party {my_index}: running online sign...");
         let delivery3 = govis::tcp_delivery::connect_tcp(my_index, addrs)
             .await
@@ -382,7 +380,6 @@ fn print_signature(
         sign::verify_signature(public_key, msg_digest, r_bytes, s_bytes)
     );
 
-    // Ethereum 65-byte format
     let eth_sig = sign::ethereum_signature(r_bytes, s_bytes, rec_id, None);
     println!("Ethereum: 0x{}", hex::encode(&eth_sig));
     let eth_sig_eip155 = sign::ethereum_signature(r_bytes, s_bytes, rec_id, Some(1));
@@ -391,7 +388,6 @@ fn print_signature(
         hex::encode(&eth_sig_eip155)
     );
 
-    // Bitcoin DER format
     let btc_sig = sign::bitcoin_der_signature(r_bytes, s_bytes);
     println!("Bitcoin DER: {}", hex::encode(&btc_sig));
 }

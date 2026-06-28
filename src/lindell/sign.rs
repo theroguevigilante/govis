@@ -225,7 +225,6 @@ where
     let round3 = mpc.add_round(RoundInput::<Round3Msg>::broadcast(i, n));
     let mut mpc = mpc.finish_setup();
 
-    // Round 1: P1 broadcasts Paillier pk + encrypted nonce + ZK proofs
     let mut p1_state: Option<P1State> = None;
     if is_p1 {
         let kp = paillier::generate_keypair(paillier_bits());
@@ -273,7 +272,6 @@ where
 
     let msgs1 = mpc.complete(round1).await.map_err(Error::Round1Receive)?;
 
-    // Round 2: P2 receives P1's data, verifies proofs, sends encrypted contribution
     if is_p2 {
         let p1_msg = msgs1
             .into_iter_indexed()
@@ -314,7 +312,6 @@ where
             ));
         }
 
-        // Compute c_s2 = c_k_inv^(λ·(m + r·share)) mod N^2
         // This encrypts k_inv · λ · (m + r·share) under P1's Paillier key
         let r = point_x_coord(&r_point);
         let mul_scalar = lambda * (msg + r * share.as_ref());
@@ -353,7 +350,6 @@ where
 
     let msgs2 = mpc.complete(round2).await.map_err(Error::Round2Receive)?;
 
-    // Round 3: P1 decrypts, verifies, computes s
     if is_p1 {
         let (my_sk, my_pk, k, k_inv, _r_point_bytes, c_k_inv_val) =
             p1_state.ok_or(Error::ProtocolViolation("P1: no state"))?;
@@ -409,7 +405,6 @@ where
 
         Ok((r_bytes, s_bytes, rec_id))
     } else {
-        // P2: wait for signature from P1
         mpc.reliably_broadcast(SignMsg::Round3(Round3Msg::Signature {
             r_bytes: vec![],
             s_bytes: vec![],

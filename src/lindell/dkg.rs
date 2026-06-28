@@ -248,11 +248,9 @@ pub mod tests {
         let initial = run_dkg_sync(t, n);
         let pk_initial = initial[0].public_key;
 
-        // Simulate CLI hex serialization
         let old_share_hex = hex::encode(initial[0].secret_share.as_ref().to_be_bytes());
         let master_pk_hex = hex::encode(pk_initial.to_bytes(true));
 
-        // Simulate CLI hex deserialization (as run_refresh_cli does)
         let old_share_bytes = hex::decode(&old_share_hex).unwrap();
         let old_share = generic_ec::SecretScalar::<generic_ec::curves::Secp256k1>::new(
             &mut generic_ec::Scalar::<generic_ec::curves::Secp256k1>::from_be_bytes_mod_order(

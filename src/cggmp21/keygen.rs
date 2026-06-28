@@ -68,7 +68,6 @@ where
     let round3 = mpc.add_round(RoundInput::<Round3Msg>::reliable_broadcast(i, n));
     let mut mpc = mpc.finish_setup();
 
-    // Generate Paillier key + Blum proof
     let (p, q, kp) = paillier::generate_keypair_ext(crate::lindell::sign::paillier_bits());
     let pk1 = kp.pk;
     let sk1 = kp.sk;
@@ -86,7 +85,6 @@ where
 
     let round1_msgs = mpc.complete(round1).await.map_err(Error::Round1Receive)?;
 
-    // Verify all Blum proofs
     let mut peer_paillier_pks = vec![None; n as usize];
     peer_paillier_pks[i as usize] = Some(pk1.clone());
     for (sender, _, msg1) in round1_msgs.iter_indexed() {
@@ -104,7 +102,6 @@ where
         peer_paillier_pks[sender as usize] = Some(pk);
     }
 
-    // Generate VSS polynomial
     let ec_secret = SecretScalar::<Secp256k1>::random(&mut rng);
     let (commitments, secret_shares) = evaluate_polynomial(ec_secret.clone(), t, n);
     let nonce = SecretScalar::<Secp256k1>::random(&mut rng);
@@ -126,7 +123,6 @@ where
 
     let round2_msgs = mpc.complete(round2).await.map_err(Error::Round2Receive)?;
 
-    // Round 3: reveal + P2P encrypted shares + proofs
     let schnorr_proof =
         paillier_zk::prove_schnorr(ec_secret.as_ref(), &commitments[0], sid, &mut rng);
     let mut encrypted_shares = Vec::new();
@@ -166,7 +162,6 @@ where
 
     let round3_msgs = mpc.complete(round3).await.map_err(Error::Round3Receive)?;
 
-    // Verify commitments, ZK proofs, compute combined share and public key
     let mut combined_share = *secret_shares[i as usize].as_ref();
     let mut public_key = Point::generator() * ec_secret.as_ref();
     for (sender, _, msg3) in round3_msgs.iter_indexed() {
@@ -198,7 +193,6 @@ where
         let pk_point = msg3.polynomial_coeff_points[0];
         public_key += pk_point;
 
-        // Decrypt and verify encrypted share from this sender
         if sender != i {
             // Find the correct encrypted share for party i
             let enc_idx = if sender < i {
