@@ -13,9 +13,10 @@ pub struct Cggmp21KeygenOutput {
 }
 
 impl Cggmp21KeygenOutput {
-    pub fn to_key_data(&self) -> crate::types::Cggmp21KeyData {
+    pub fn to_key_data(&self, party_index: u16) -> crate::types::Cggmp21KeyData {
         crate::types::Cggmp21KeyData {
             protocol: "cggmp21".into(),
+            party_index,
             ec_share: self.ec_share.as_ref().to_be_bytes().to_vec(),
             public_key: self.public_key.to_bytes(true).to_vec(),
         }

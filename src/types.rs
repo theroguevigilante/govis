@@ -41,14 +41,16 @@ pub struct DkgOutput {
 #[derive(Serialize, Deserialize)]
 pub struct LindellKeyData {
     pub protocol: String,
+    pub party_index: u16,
     pub secret_share: Vec<u8>,
     pub public_key: Vec<u8>,
 }
 
 impl DkgOutput {
-    pub fn to_key_data(&self) -> LindellKeyData {
+    pub fn to_key_data(&self, party_index: u16) -> LindellKeyData {
         LindellKeyData {
             protocol: "lindell".into(),
+            party_index,
             secret_share: self.secret_share.as_ref().to_be_bytes().to_vec(),
             public_key: self.public_key.to_bytes(true).to_vec(),
         }
@@ -76,6 +78,7 @@ pub type RefreshShares = DkgShares;
 #[derive(Serialize, Deserialize)]
 pub struct Cggmp21KeyData {
     pub protocol: String,
+    pub party_index: u16,
     pub ec_share: Vec<u8>,
     pub public_key: Vec<u8>,
 }

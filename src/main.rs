@@ -3,22 +3,48 @@ use std::net::SocketAddr;
 use govis::cggmp21;
 use govis::lindell::sign;
 use round_based::mpc;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use govis::types::{Cggmp21KeyData, DkgOutput, LindellKeyData};
+
+#[derive(Deserialize)]
+struct KeyFileHeader {
+    protocol: String,
+    party_index: u16,
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    let my_index: u16 = match get_arg(&args, "--index") {
-        Some(s) => s.parse().expect("invalid --index"),
-        None => {
-            eprintln!(
-                "Usage: {} --index <i> --addrs <host:port,...> [--protocol <lindell|cggmp21>] [--threshold <t>] [--signers <i,j,...>] [--sid <id>] [--sign <hex> | --file <path>] [--refresh --old-share <hex> --master-pk <hex>] [--save-key <file>] [--load-key <file>] [--paillier-bits <bits>]",
-                args[0]
-            );
+    let my_index: u16 = if let Some(path) = get_arg(&args, "--load-key") {
+        if get_arg(&args, "--index").is_some() {
+            eprintln!("Warning: --index is ignored when --load-key is used (using index from key file)");
+        }
+        let data = std::fs::read(path).unwrap_or_else(|e| {
+            eprintln!("Failed to read --load-key {path}: {e}");
             std::process::exit(1);
+        });
+        let header: KeyFileHeader = bincode::deserialize(&data).unwrap_or_else(|e| {
+            eprintln!("Failed to parse key file {path}: {e}");
+            std::process::exit(1);
+        });
+        eprintln!(
+            "Party {}: loaded {} key from {path}",
+            header.party_index, header.protocol
+        );
+        header.party_index
+    } else {
+        match get_arg(&args, "--index") {
+            Some(s) => s.parse().expect("invalid --index"),
+            None => {
+                eprintln!(
+                    "Usage: {} --index <i> --addrs <host:port,...> [--protocol <lindell|cggmp21>] [--threshold <t>] [--signers <i,j,...>] [--sid <id>] [--sign <hex> | --file <path>] [--refresh --old-share <hex> --master-pk <hex>] [--save-key <file>] [--load-key <file>] [--paillier-bits <bits>]",
+                    args[0]
+                );
+                std::process::exit(1);
+            }
         }
     };
 
@@ -178,7 +204,7 @@ async fn run_lindell(
     };
 
     if let Some(path) = get_arg(args, "--save-key") {
-        let key_data = output.to_key_data();
+        let key_data = output.to_key_data(my_index);
         let bytes = bincode::serialize(&key_data).expect("failed to serialize key data");
         std::fs::write(path, &bytes).unwrap_or_else(|e| {
             eprintln!("Failed to write --save-key: {e}");
@@ -285,7 +311,7 @@ async fn run_cggmp21(
     };
 
     if let Some(path) = get_arg(args, "--save-key") {
-        let key_data = output.to_key_data();
+        let key_data = output.to_key_data(my_index);
         let bytes = bincode::serialize(&key_data).expect("failed to serialize key data");
         std::fs::write(path, &bytes).unwrap_or_else(|e| {
             eprintln!("Failed to write --save-key: {e}");
@@ -461,7 +487,7 @@ async fn run_refresh_cli(
             secret_share: output.secret_share.clone(),
             public_key: master_pk,
         }
-        .to_key_data();
+        .to_key_data(my_index);
         let bytes = bincode::serialize(&key_data).expect("failed to serialize key data");
         std::fs::write(path, &bytes).unwrap_or_else(|e| {
             eprintln!("Failed to write --save-key: {e}");
