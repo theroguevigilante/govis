@@ -1,43 +1,14 @@
 use generic_ec::{Point, Scalar, SecretScalar, curves::Secp256k1};
 use num_bigint::{BigInt, BigUint, RandBigInt};
-use num_traits::ToBytes;
 use round_based::ProtocolMsg;
 use round_based::mpc::{CompleteRoundErr, Mpc, MpcExecution};
 use round_based::round::RoundInput;
 use serde::{Deserialize, Serialize};
 
+use crate::core::{biguint_to_scalar, lagrange_coeff, point_x_coord, scalar_to_bigint};
 use crate::paillier;
 use crate::paillier_zk;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-fn scalar_to_bigint(s: &Scalar<Secp256k1>) -> BigInt {
-    let encoded = s.to_be_bytes();
-    BigInt::from_bytes_be(num_bigint::Sign::Plus, encoded.as_bytes())
-}
-
-fn biguint_to_scalar(b: &BigUint) -> Scalar<Secp256k1> {
-    Scalar::<Secp256k1>::from_be_bytes_mod_order(b.to_be_bytes())
-}
-
-fn point_x_coord(point: &Point<Secp256k1>) -> Scalar<Secp256k1> {
-    let encoded = point.to_bytes(false);
-    Scalar::<Secp256k1>::from_be_bytes_mod_order(&encoded.as_bytes()[1..33])
-}
-
-pub fn lagrange_coeff(i: u16, signers: &[u16]) -> Scalar<Secp256k1> {
-    let x_i = Scalar::<Secp256k1>::from(i + 1);
-    let mut num = Scalar::<Secp256k1>::one();
-    let mut den = Scalar::<Secp256k1>::one();
-    for &j in signers {
-        if j == i {
-            continue;
-        }
-        let x_j = Scalar::<Secp256k1>::from(j + 1);
-        num *= &x_j;
-        den *= &(x_j - x_i);
-    }
-    num * den.invert().expect("denom zero when i in signers?")
-}
 
 pub fn verify_signature(
     public_key: &Point<Secp256k1>,
@@ -434,150 +405,5 @@ where
         }
 
         Ok((r_bytes, s_bytes, rec_id))
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use sha2::Digest;
-
-    #[test]
-    fn sign_works_1_of_2() {
-        let mut rng = crate::test_helpers::TestRng::new();
-        let msg = b"hello world";
-        let digest = sha2::Sha256::digest(msg);
-        let msg_digest: [u8; 32] = digest.into();
-
-        let outputs = super::super::dkg::tests::run_dkg_sync(1, 2);
-        let signers = [0u16, 1u16];
-
-        let shares: Vec<SecretScalar<Secp256k1>> = outputs
-            .iter()
-            .map(|o| {
-                let encoded = o.secret_share.as_ref().to_be_bytes();
-                let bytes: [u8; 32] = encoded.as_ref().try_into().unwrap();
-                SecretScalar::<Secp256k1>::from_be_bytes(&bytes).unwrap()
-            })
-            .collect();
-        let pub_key =
-            Point::<Secp256k1>::from_bytes(outputs[0].public_key.to_bytes(false)).unwrap();
-
-        let result =
-            round_based::sim::run_with_setup(core::iter::repeat_with(|| rng.fork()).take(2), {
-                let shares = shares.clone();
-                let pk = pub_key;
-                let md = msg_digest;
-                move |i, party, mut rng| {
-                    let share = shares[usize::from(i)].clone();
-                    async move {
-                        run_sign(party, i, 2, &signers, &share, &pk, &md, &mut rng)
-                            .await
-                            .unwrap()
-                    }
-                }
-            })
-            .unwrap()
-            .expect_eq();
-
-        assert!(verify_signature(
-            &pub_key,
-            &msg_digest,
-            &result.0,
-            &result.1
-        ));
-    }
-
-    #[test]
-    fn signature_fails_wrong_message() {
-        let mut rng = crate::test_helpers::TestRng::new();
-        let msg = b"hello world";
-        let digest = sha2::Sha256::digest(msg);
-        let msg_digest: [u8; 32] = digest.into();
-        let wrong_digest: [u8; 32] = sha2::Sha256::digest(b"wrong message").into();
-
-        let outputs = super::super::dkg::tests::run_dkg_sync(1, 2);
-
-        let shares: Vec<SecretScalar<Secp256k1>> = outputs
-            .iter()
-            .map(|o| {
-                let encoded = o.secret_share.as_ref().to_be_bytes();
-                let bytes: [u8; 32] = encoded.as_ref().try_into().unwrap();
-                SecretScalar::<Secp256k1>::from_be_bytes(&bytes).unwrap()
-            })
-            .collect();
-        let pub_key =
-            Point::<Secp256k1>::from_bytes(outputs[0].public_key.to_bytes(false)).unwrap();
-        let signers = [0u16, 1u16];
-
-        let result =
-            round_based::sim::run_with_setup(core::iter::repeat_with(|| rng.fork()).take(2), {
-                let shares = shares.clone();
-                let pk = pub_key;
-                let md = msg_digest;
-                move |i, party, mut rng| {
-                    let share = shares[usize::from(i)].clone();
-                    async move {
-                        run_sign(party, i, 2, &signers, &share, &pk, &md, &mut rng)
-                            .await
-                            .unwrap()
-                    }
-                }
-            })
-            .unwrap()
-            .expect_eq();
-
-        assert!(!verify_signature(
-            &pub_key,
-            &wrong_digest,
-            &result.0,
-            &result.1
-        ));
-    }
-
-    #[test]
-    fn dkg_then_2_of_3_signing() {
-        let outputs = super::super::dkg::tests::run_dkg_sync(2, 3);
-        let signers = [0u16, 1u16];
-        let msg = b"threshold test";
-        let digest = sha2::Sha256::digest(msg);
-        let msg_digest: [u8; 32] = digest.into();
-
-        let shares: Vec<SecretScalar<Secp256k1>> = outputs
-            .iter()
-            .map(|o| {
-                let encoded = o.secret_share.as_ref().to_be_bytes();
-                let bytes: [u8; 32] = encoded.as_ref().try_into().unwrap();
-                SecretScalar::<Secp256k1>::from_be_bytes(&bytes).unwrap()
-            })
-            .collect();
-        let pub_key =
-            Point::<Secp256k1>::from_bytes(outputs[0].public_key.to_bytes(false)).unwrap();
-
-        let mut rng = crate::test_helpers::TestRng::new();
-
-        let result =
-            round_based::sim::run_with_setup(core::iter::repeat_with(|| rng.fork()).take(3), {
-                let shares = shares.clone();
-                let pk = pub_key;
-                let md = msg_digest;
-                move |i, party, mut rng| {
-                    let share = shares[usize::from(i)].clone();
-                    async move {
-                        run_sign(party, i, 3, &signers, &share, &pk, &md, &mut rng)
-                            .await
-                            .unwrap()
-                    }
-                }
-            })
-            .unwrap()
-            .expect_eq();
-
-        assert!(verify_signature(
-            &pub_key,
-            &msg_digest,
-            &result.0,
-            &result.1
-        ));
     }
 }

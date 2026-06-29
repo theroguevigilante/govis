@@ -8,7 +8,7 @@ use round_based::round::RoundInput;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::mta;
+use crate::core::{point_x_coord, scalar_to_bigint};
 use crate::paillier;
 use crate::paillier_zk;
 
@@ -48,26 +48,6 @@ pub struct Presignature {
     pub k_inv: Scalar<Secp256k1>,
     pub r: Scalar<Secp256k1>,
     pub r_point: Point<Secp256k1>,
-}
-
-pub fn point_x_coord(point: &Point<Secp256k1>) -> Scalar<Secp256k1> {
-    let encoded = point.to_bytes(false);
-    Scalar::<Secp256k1>::from_be_bytes_mod_order(&encoded.as_ref()[1..33])
-}
-
-pub fn lagrange_coeff(i: u16, signers: &[u16]) -> Scalar<Secp256k1> {
-    let xi = Scalar::<Secp256k1>::from(i + 1);
-    let mut num = Scalar::<Secp256k1>::one();
-    let mut den = Scalar::<Secp256k1>::one();
-    for &j in signers {
-        if j == i {
-            continue;
-        }
-        let xj = Scalar::<Secp256k1>::from(j + 1);
-        num *= Scalar::<Secp256k1>::zero() - xj;
-        den *= xi - xj;
-    }
-    num * den.invert().expect("signer indices must be distinct")
 }
 
 fn secp256k1_order() -> BigUint {
@@ -190,7 +170,7 @@ where
 
     let r = point_x_coord(&r_point_total);
 
-    let k_bi = mta::scalar_to_bigint(&k_scalar);
+    let k_bi = scalar_to_bigint(&k_scalar);
     let order = BigInt::from_biguint(num_bigint::Sign::Plus, secp256k1_order());
 
     let mut send_many = mpc.send_many();

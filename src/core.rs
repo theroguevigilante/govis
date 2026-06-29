@@ -1,7 +1,38 @@
 use crate::types::{DkgShares, RefreshShares};
 use generic_ec::{Point, Scalar, SecretScalar, curves::Secp256k1};
+use num_bigint::{BigInt, BigUint};
+use num_traits::ToBytes;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha256};
+
+pub fn scalar_to_bigint(s: &Scalar<Secp256k1>) -> BigInt {
+    let encoded = s.to_be_bytes();
+    BigInt::from_bytes_be(num_bigint::Sign::Plus, encoded.as_bytes())
+}
+
+pub fn biguint_to_scalar(b: &BigUint) -> Scalar<Secp256k1> {
+    Scalar::<Secp256k1>::from_be_bytes_mod_order(b.to_be_bytes())
+}
+
+pub fn point_x_coord(point: &Point<Secp256k1>) -> Scalar<Secp256k1> {
+    let encoded = point.to_bytes(false);
+    Scalar::<Secp256k1>::from_be_bytes_mod_order(&encoded.as_bytes()[1..33])
+}
+
+pub fn lagrange_coeff(i: u16, signers: &[u16]) -> Scalar<Secp256k1> {
+    let x_i = Scalar::<Secp256k1>::from(i + 1);
+    let mut num = Scalar::<Secp256k1>::one();
+    let mut den = Scalar::<Secp256k1>::one();
+    for &j in signers {
+        if j == i {
+            continue;
+        }
+        let x_j = Scalar::<Secp256k1>::from(j + 1);
+        num *= &x_j;
+        den *= &(x_j - x_i);
+    }
+    num * den.invert().expect("denom zero when i in signers?")
+}
 
 fn generate_shares_internal<R: RngCore + CryptoRng>(
     intercept: SecretScalar<Secp256k1>,

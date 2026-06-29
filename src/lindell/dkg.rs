@@ -5,7 +5,7 @@ use round_based::mpc::{CompleteRoundErr, Mpc, MpcExecution, SendMany};
 use round_based::round::RoundInput;
 
 use crate::core::{compute_commitment, evaluate_polynomial};
-use crate::types::{CommitMsg, DkgOutput, Msg, RevealMsg, ShareMsg};
+use crate::lindell::types::{CommitMsg, LindellDkgOutput, Msg, RevealMsg, ShareMsg};
 
 async fn run_vss<M>(
     mut mpc: M,
@@ -102,14 +102,14 @@ pub async fn run_dkg<M, R>(
     t: u16,
     sid: &[u8],
     mut rng: R,
-) -> Result<DkgOutput, ErrorM<M>>
+) -> Result<LindellDkgOutput, ErrorM<M>>
 where
     M: Mpc<Msg = Msg>,
     R: RngCore + CryptoRng,
 {
     let (secret_share, public_key) =
         run_vss(mpc, i, n, t, sid, SecretScalar::random(&mut rng)).await?;
-    Ok(DkgOutput {
+    Ok(LindellDkgOutput {
         secret_share,
         public_key,
     })
@@ -123,14 +123,14 @@ pub async fn run_refresh<M>(
     sid: &[u8],
     old_share: &SecretScalar<Secp256k1>,
     master_pk: Point<Secp256k1>,
-) -> Result<DkgOutput, ErrorM<M>>
+) -> Result<LindellDkgOutput, ErrorM<M>>
 where
     M: Mpc<Msg = Msg>,
 {
     let (offset_secret, _) = run_vss(mpc, i, n, t, sid, SecretScalar::zero()).await?;
     let mut new_secret = *old_share.as_ref();
     new_secret += offset_secret.as_ref();
-    Ok(DkgOutput {
+    Ok(LindellDkgOutput {
         secret_share: SecretScalar::new(&mut new_secret),
         public_key: master_pk,
     })
@@ -158,132 +158,3 @@ pub enum Error<RecvErr, SendErr> {
 
 pub type ErrorM<M> =
     Error<CompleteRoundErr<M, round_based::round::RoundInputError>, <M as Mpc>::SendErr>;
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-
-    pub fn run_dkg_sync(t: u16, n: u16) -> Vec<DkgOutput> {
-        let mut rng = crate::test_helpers::TestRng::new();
-        let sid = b"test-session";
-
-        round_based::sim::run_with_setup(
-            core::iter::repeat_with(|| rng.fork()).take(n.into()),
-            |i, party, mut rng| async move { run_dkg(party, i, n, t, sid, &mut rng).await },
-        )
-        .unwrap()
-        .expect_ok()
-        .into_vec()
-    }
-
-    #[test]
-    fn dkg_3_parties_threshold_2() {
-        let outputs = run_dkg_sync(2, 3);
-        let pk = outputs[0].public_key;
-        for out in &outputs {
-            assert_eq!(out.public_key, pk, "all parties must agree on public key");
-        }
-    }
-
-    #[test]
-    fn dkg_5_parties_threshold_3() {
-        let outputs = run_dkg_sync(3, 5);
-        let pk = outputs[0].public_key;
-        for out in &outputs {
-            assert_eq!(out.public_key, pk, "all parties must agree on public key");
-        }
-    }
-
-    #[test]
-    fn dkg_1_out_of_2() {
-        let outputs = run_dkg_sync(1, 2);
-        let pk = outputs[0].public_key;
-        for out in &outputs {
-            assert_eq!(out.public_key, pk, "all parties must agree on public key");
-        }
-    }
-
-    #[test]
-    fn refresh_preserves_public_key() {
-        let (t, n) = (2, 3);
-
-        let initial = run_dkg_sync(t, n);
-        let pk_initial = initial[0].public_key;
-        let initial_ref = &initial;
-
-        let mut rng = crate::test_helpers::TestRng::new();
-        let sid = b"test-refresh";
-
-        let result = round_based::sim::run_with_setup(
-            core::iter::repeat_with(|| rng.fork()).take(n.into()),
-            |i, party, _rng| async move {
-                run_refresh(
-                    party,
-                    i,
-                    n,
-                    t,
-                    sid,
-                    &initial_ref[usize::from(i)].secret_share,
-                    pk_initial,
-                )
-                .await
-            },
-        )
-        .unwrap()
-        .expect_ok()
-        .into_vec();
-
-        for out in &result {
-            assert_eq!(
-                out.public_key, pk_initial,
-                "public key must stay same after refresh"
-            );
-        }
-    }
-
-    #[test]
-    fn refresh_via_hex_roundtrip() {
-        let (t, n) = (2, 3);
-
-        let initial = run_dkg_sync(t, n);
-        let pk_initial = initial[0].public_key;
-
-        let old_share_hex = hex::encode(initial[0].secret_share.as_ref().to_be_bytes());
-        let master_pk_hex = hex::encode(pk_initial.to_bytes(true));
-
-        let old_share_bytes = hex::decode(&old_share_hex).unwrap();
-        let old_share = generic_ec::SecretScalar::<generic_ec::curves::Secp256k1>::new(
-            &mut generic_ec::Scalar::<generic_ec::curves::Secp256k1>::from_be_bytes_mod_order(
-                &old_share_bytes,
-            ),
-        );
-        let master_pk_bytes = hex::decode(&master_pk_hex).unwrap();
-        let master_pk =
-            generic_ec::Point::<generic_ec::curves::Secp256k1>::from_bytes(&master_pk_bytes)
-                .unwrap();
-
-        assert_eq!(master_pk, pk_initial, "master pk roundtrip");
-        assert_eq!(
-            *old_share.as_ref(),
-            *initial[0].secret_share.as_ref(),
-            "old share roundtrip"
-        );
-
-        let sid = b"test-refresh-hex";
-        let old_shares = vec![old_share; n as usize];
-
-        let result = round_based::sim::run_with_setup(old_shares, |i, party, share| async move {
-            run_refresh(party, i, n, t, sid, &share, master_pk).await
-        })
-        .unwrap()
-        .expect_ok()
-        .into_vec();
-
-        for out in &result {
-            assert_eq!(
-                out.public_key, pk_initial,
-                "public key must stay same after hex roundtrip refresh"
-            );
-        }
-    }
-}

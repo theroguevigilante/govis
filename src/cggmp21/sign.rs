@@ -4,7 +4,8 @@ use round_based::mpc::{CompleteRoundErr, Mpc, MpcExecution};
 use round_based::round::RoundInput;
 use serde::{Deserialize, Serialize};
 
-use super::presign::{Presignature, lagrange_coeff};
+use crate::core::lagrange_coeff;
+use super::presign::Presignature;
 use crate::lindell::sign::verify_signature;
 
 #[derive(ProtocolMsg, Clone, Debug, Serialize, Deserialize)]

@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 
 use super::super::paillier;
 use super::super::paillier_zk;
-use crate::core::{compute_commitment, evaluate_polynomial};
+use crate::core::{compute_commitment, evaluate_polynomial, scalar_to_bigint};
 
 #[derive(ProtocolMsg, Clone, Debug, Serialize, Deserialize)]
 pub enum KeygenMsg {
@@ -231,7 +231,4 @@ where
     })
 }
 
-fn scalar_to_bigint(s: &Scalar<Secp256k1>) -> BigInt {
-    let encoded = s.to_be_bytes();
-    BigInt::from_bytes_be(num_bigint::Sign::Plus, encoded.as_bytes())
-}
+

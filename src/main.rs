@@ -6,7 +6,8 @@ use round_based::mpc;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use govis::types::{Cggmp21KeyData, DkgOutput, LindellKeyData};
+use govis::cggmp21::types::Cggmp21KeyData;
+use govis::lindell::types::{LindellDkgOutput, LindellKeyData};
 
 #[derive(Deserialize)]
 struct KeyFileHeader {
@@ -173,7 +174,7 @@ async fn run_lindell(
             std::process::exit(1);
         });
         eprintln!("Party {my_index}: loaded key from {path}");
-        DkgOutput::from_key_data(&key_data)
+        LindellDkgOutput::from_key_data(&key_data)
     } else {
         let delivery = govis::tcp_delivery::connect_tcp(my_index, addrs)
             .await
@@ -280,7 +281,7 @@ async fn run_cggmp21(
             std::process::exit(1);
         });
         eprintln!("Party {my_index}: loaded key from {path}");
-        cggmp21::Cggmp21KeygenOutput::from_key_data(&key_data)
+        cggmp21::types::Cggmp21KeygenOutput::from_key_data(&key_data)
     } else {
         let delivery = govis::tcp_delivery::connect_tcp(my_index, addrs)
             .await
@@ -435,7 +436,7 @@ async fn run_refresh_cli(
             eprintln!("Error: {path} is not a valid Lindell key file.");
             std::process::exit(1);
         });
-        let out = DkgOutput::from_key_data(&key_data);
+        let out = LindellDkgOutput::from_key_data(&key_data);
         eprintln!("Party {my_index}: loaded key from {path}");
         (out.secret_share, out.public_key)
     } else {
@@ -483,7 +484,7 @@ async fn run_refresh_cli(
     });
 
     if let Some(path) = get_arg(args, "--save-key") {
-        let key_data = DkgOutput {
+        let key_data = LindellDkgOutput {
             secret_share: output.secret_share.clone(),
             public_key: master_pk,
         }

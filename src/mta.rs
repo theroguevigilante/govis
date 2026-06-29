@@ -22,11 +22,6 @@ pub struct MtaResult {
     pub beta: Scalar<Secp256k1>,
 }
 
-pub fn scalar_to_bigint(s: &Scalar<Secp256k1>) -> BigInt {
-    let encoded = s.to_be_bytes();
-    BigInt::from_bytes_be(num_bigint::Sign::Plus, encoded.as_bytes())
-}
-
 pub fn mta_round1(
     pk_j: &paillier::PaillierPublicKey,
     b: &BigInt,

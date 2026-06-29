@@ -5,6 +5,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::core::scalar_to_bigint;
 use crate::paillier;
 
 fn bu2bi(u: &BigUint) -> BigInt {
@@ -13,11 +14,6 @@ fn bu2bi(u: &BigUint) -> BigInt {
 
 fn g_pow(m: &BigInt, n: &BigInt, n_sq: &BigInt) -> BigInt {
     (BigInt::one() + m * n) % n_sq
-}
-
-fn scalar_to_bigint(s: &Scalar<Secp256k1>) -> BigInt {
-    let encoded = s.to_be_bytes();
-    BigInt::from_bytes_be(num_bigint::Sign::Plus, encoded.as_bytes())
 }
 
 /// Non-interactive range proof for Paillier.
@@ -603,7 +599,6 @@ pub fn verify_log(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::paillier;
 
     #[test]
     fn range_proof_honest_prover() {
