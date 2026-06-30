@@ -1,6 +1,6 @@
 # govis
 
-A Rust implementation of threshold ECDSA over secp256k1 supporting both the Lindell (2-of-n) and CGGMP21 (t-of-n) protocols.
+Rust implementation of threshold ECDSA over secp256k1 based on the Lindell and CGGMP21 protocols. 
 
 ## Status
 
@@ -189,11 +189,13 @@ This implementation is based on the following works:
 - This project is highly experimental.
 - The implementation tries to follow Lindell and CGGMP21 protocols but has not undergone an independent security audit.
 - Use caution before deploying it in production.
+- 🔒 [Security Policy](SECURITY.md)
 
 ## Contributing
+
 - Contributions are welcome.
 - Please open an issue for discussion before significant changes.
 
 ## License
 
-GNU General Public License v3.0 (GPL-3.0). See `LICENSE`.
+GNU General Public License v3.0 (GPL-3.0). See [License](LICENSE).
