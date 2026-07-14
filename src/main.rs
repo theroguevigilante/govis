@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use govis::cggmp21;
 use govis::lindell::sign;
+use govis::paillier;
 use round_based::mpc;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -94,7 +95,7 @@ async fn main() {
 
     if let Some(bits_str) = get_arg(&args, "--paillier-bits") {
         let bits: usize = bits_str.parse().expect("invalid --paillier-bits");
-        sign::set_paillier_bits(bits);
+        paillier::set_paillier_bits(bits);
         eprintln!("Using Paillier modulus size: {bits} bits");
     }
 

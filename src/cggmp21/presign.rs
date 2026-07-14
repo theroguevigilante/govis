@@ -98,7 +98,7 @@ where
     let round3 = mpc.add_round(RoundInput::<EncryptedKMsg>::p2p(local_i, m));
     let mut mpc = mpc.finish_setup();
 
-    let kp = paillier::generate_keypair(crate::lindell::sign::paillier_bits());
+    let kp = paillier::generate_keypair(crate::paillier::paillier_bits());
 
     mpc.reliably_broadcast(PresignMsg::Round0(PaillierPKMsg {
         n: kp.pk.n.clone(),

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::core::{biguint_to_scalar, lagrange_coeff, point_x_coord, scalar_to_bigint};
 use crate::paillier;
 use crate::paillier_zk;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn verify_signature(
     public_key: &Point<Secp256k1>,
@@ -76,19 +75,6 @@ pub fn bitcoin_der_signature(r_bytes: &[u8], s_bytes: &[u8]) -> Vec<u8> {
     sig.push(s_enc.len() as u8);
     sig.extend_from_slice(&s_enc);
     sig
-}
-
-#[cfg(not(test))]
-static PAILLIER_BITS: AtomicUsize = AtomicUsize::new(2048);
-#[cfg(test)]
-static PAILLIER_BITS: AtomicUsize = AtomicUsize::new(1024);
-
-pub fn paillier_bits() -> usize {
-    PAILLIER_BITS.load(Ordering::Relaxed)
-}
-
-pub fn set_paillier_bits(bits: usize) {
-    PAILLIER_BITS.store(bits, Ordering::Relaxed);
 }
 
 const CURVE_BITS: usize = 256;
@@ -198,7 +184,7 @@ where
 
     let mut p1_state: Option<P1State> = None;
     if is_p1 {
-        let kp = paillier::generate_keypair(paillier_bits());
+        let kp = paillier::generate_keypair(crate::paillier::paillier_bits());
         let k = Scalar::<Secp256k1>::random(rng);
         let k_inv = k.invert().expect("k is zero (astronomically unlikely)");
         let r_point = Point::generator() * k;

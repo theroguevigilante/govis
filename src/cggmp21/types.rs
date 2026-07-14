@@ -31,21 +31,13 @@ impl Cggmp21KeygenOutput {
     pub fn from_key_data(data: &Cggmp21KeyData) -> Self {
         assert_eq!(data.protocol, "cggmp21", "key file protocol mismatch");
         let mut s = Scalar::<Secp256k1>::from_be_bytes_mod_order(&data.ec_share);
-        let paillier_sk = crate::paillier::PaillierPrivateKey {
-            lambda: num_bigint::BigUint::from(0u32),
-            mu: num_bigint::BigUint::from(0u32),
-        };
-        let paillier_pk = crate::paillier::PaillierPublicKey {
-            n: num_bigint::BigUint::from(0u32),
-            n_sq: num_bigint::BigUint::from(0u32),
-            g: num_bigint::BigUint::from(0u32),
-        };
+        let kp = crate::paillier::generate_keypair(crate::paillier::paillier_bits());
         Self {
             ec_share: SecretScalar::new(&mut s),
             public_key: Point::<Secp256k1>::from_bytes(&data.public_key)
                 .expect("invalid public key in key data"),
-            paillier_sk,
-            paillier_pk,
+            paillier_sk: kp.sk,
+            paillier_pk: kp.pk,
             peer_paillier_pks: Vec::new(),
         }
     }

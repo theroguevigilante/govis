@@ -3,6 +3,7 @@ use num_integer::Integer;
 use num_primes::Generator;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPublicKey {
@@ -142,6 +143,19 @@ pub fn generate_keypair_ext(bits: usize) -> (BigUint, BigUint, PaillierKeypair) 
             },
         );
     }
+}
+
+#[cfg(not(test))]
+static PAILLIER_BITS: AtomicUsize = AtomicUsize::new(2048);
+#[cfg(test)]
+static PAILLIER_BITS: AtomicUsize = AtomicUsize::new(1024);
+
+pub fn paillier_bits() -> usize {
+    PAILLIER_BITS.load(Ordering::Relaxed)
+}
+
+pub fn set_paillier_bits(bits: usize) {
+    PAILLIER_BITS.store(bits, Ordering::Relaxed);
 }
 
 fn lcm(a: &BigUint, b: &BigUint) -> BigUint {

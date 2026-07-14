@@ -68,7 +68,7 @@ where
     let round3 = mpc.add_round(RoundInput::<Round3Msg>::reliable_broadcast(i, n));
     let mut mpc = mpc.finish_setup();
 
-    let (p, q, kp) = paillier::generate_keypair_ext(crate::lindell::sign::paillier_bits());
+    let (p, q, kp) = paillier::generate_keypair_ext(crate::paillier::paillier_bits());
     let pk1 = kp.pk;
     let sk1 = kp.sk;
     let n_bi = BigInt::from_biguint(num_bigint::Sign::Plus, pk1.n.clone());
