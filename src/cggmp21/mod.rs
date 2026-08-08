@@ -10,6 +10,7 @@ mod tests {
 
     use super::*;
     use crate::lindell::sign::verify_signature;
+    use bincode;
 
     #[test]
     fn cggmp21_2of2_keygen_presign_sign() {
@@ -422,6 +423,89 @@ mod tests {
             assert_eq!(s.s_bytes, sig.s_bytes, "s_bytes mismatch at party {}", idx);
         }
 
+        let verified = verify_signature(&pub_key, &msg_digest, &sig.r_bytes, &sig.s_bytes);
+        assert!(verified);
+    }
+
+    #[test]
+    fn cggmp21_2of2_key_roundtrip() {
+        let n = 2;
+        let signers = [0u16, 1u16];
+        let sid = b"test-roundtrip";
+        let msg_digest = [0xabu8; 32];
+        let mut rng = TestRng::new();
+
+        let t = n - 1;
+        let keygen_outputs: Vec<Cggmp21KeygenOutput> = round_based::sim::run_with_setup(
+            core::iter::repeat_with(|| rng.fork()).take(n.into()),
+            |i, party, mut rng| async move {
+                keygen::run_keygen(party, i, n, t, sid, &mut rng)
+                    .await
+                    .unwrap()
+            },
+        )
+        .unwrap()
+        .into_vec();
+
+        let pub_key = keygen_outputs[0].public_key;
+
+        // Roundtrip: serialize→deserialize party 0's key
+        let key_data = keygen_outputs[0].to_key_data(0);
+        let bytes = bincode::serialize(&key_data).unwrap();
+        let key_data_loaded: types::Cggmp21KeyData =
+            bincode::deserialize(&bytes).unwrap();
+        let loaded = types::Cggmp21KeygenOutput::from_key_data(&key_data_loaded);
+        assert_eq!(
+            loaded.public_key,
+            keygen_outputs[0].public_key,
+            "public key must match after roundtrip"
+        );
+        assert_eq!(
+            *loaded.ec_share.as_ref(),
+            *keygen_outputs[0].ec_share.as_ref(),
+            "ec share must match after roundtrip"
+        );
+
+        // Use loaded key for presign + sign
+        let loaded_outputs: Vec<Cggmp21KeygenOutput> =
+            vec![loaded, keygen_outputs[1].clone()];
+
+        let presign_outputs: Vec<presign::Presignature> = round_based::sim::run_with_setup(
+            loaded_outputs.clone(),
+            |i, party, kgen_out| async move {
+                presign::run_presign(
+                    party,
+                    signers[usize::from(i)],
+                    &signers,
+                    &kgen_out.ec_share,
+                    TestRng::new(),
+                )
+                .await
+                .unwrap()
+            },
+        )
+        .unwrap()
+        .into_vec();
+
+        let zip_iter = loaded_outputs.into_iter().zip(presign_outputs);
+        let sign_outputs: Vec<sign::Signature> =
+            round_based::sim::run_with_setup(zip_iter, |i, party, (kgen_out, presig)| async move {
+                sign::run_online_sign(
+                    party,
+                    signers[usize::from(i)],
+                    &signers,
+                    &kgen_out.ec_share,
+                    &pub_key,
+                    &msg_digest,
+                    &presig,
+                )
+                .await
+                .unwrap()
+            })
+            .unwrap()
+            .into_vec();
+
+        let sig = &sign_outputs[0];
         let verified = verify_signature(&pub_key, &msg_digest, &sig.r_bytes, &sig.s_bytes);
         assert!(verified);
     }
