@@ -1,3 +1,9 @@
+//! Lindell 2-of-2 threshold ECDSA signing with key refresh.
+//!
+//! - [`dkg`]: distributed key generation (commit-reveal Feldman VSS).
+//! - [`sign`]: threshold signing and signature utilities.
+//! - [`types`]: protocol messages and key data types.
+
 pub mod dkg;
 pub mod sign;
 pub mod types;

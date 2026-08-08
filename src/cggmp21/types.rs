@@ -1,6 +1,8 @@
 use generic_ec::{Point, Scalar, SecretScalar, curves::Secp256k1};
 use serde::{Deserialize, Serialize};
 
+/// Per-party output of CGGMP21 key generation. Keep the Paillier keys in
+/// memory; only the `ec_share` and `public_key` are persisted.
 #[derive(Clone)]
 pub struct Cggmp21KeygenOutput {
     pub ec_share: generic_ec::SecretScalar<generic_ec::curves::Secp256k1>,
@@ -10,6 +12,7 @@ pub struct Cggmp21KeygenOutput {
     pub peer_paillier_pks: Vec<Option<crate::paillier::PaillierPublicKey>>,
 }
 
+/// Persistable CGGMP21 key data: only the EC share and public key.
 #[derive(Serialize, Deserialize)]
 pub struct Cggmp21KeyData {
     pub protocol: String,

@@ -95,6 +95,9 @@ where
     Ok((SecretScalar::new(&mut final_share), combined_pk))
 }
 
+/// Runs distributed key generation for party `i` out of `n`, threshold `t`.
+/// All parties must pass the same `sid`. Returns the party's secret share
+/// and the shared public key.
 pub async fn run_dkg<M, R>(
     mpc: M,
     i: u16,
@@ -115,6 +118,8 @@ where
     })
 }
 
+/// Re-randomizes every party's share without changing the public key.
+/// Each party supplies its current `old_share` and the `master_pk`.
 pub async fn run_refresh<M>(
     mpc: M,
     i: u16,

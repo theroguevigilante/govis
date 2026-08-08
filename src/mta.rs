@@ -1,3 +1,5 @@
+//! Multiplication-to-addition (MtA) protocol with Paillier encryption.
+
 use generic_ec::{Scalar, curves::Secp256k1};
 use num_bigint::{BigInt, RandBigInt};
 use num_traits::Zero;

@@ -1,6 +1,13 @@
-//! # Govis Library
-//! This crate handles threshold cryptography and key refreshes.
-//! It is built for speed and security.
+//! # Govis
+//!
+//! Threshold ECDSA for secp256k1 with two protocols:
+//!
+//! - [`lindell`]: Lindell 2-of-2 signing with key refresh.
+//! - [`cggmp21`]: CGGMP21 threshold signing with arbitrary thresholds.
+//!
+//! Each protocol exposes a keygen phase and a signing phase. The
+//! `round-based` crate drives the multi-party execution; use its `sim`
+//! module for tests or [`tcp_delivery`] for real networking.
 
 pub mod cggmp21;
 pub mod core;

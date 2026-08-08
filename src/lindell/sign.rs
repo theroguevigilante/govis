@@ -9,6 +9,7 @@ use crate::core::{biguint_to_scalar, lagrange_coeff, point_x_coord, scalar_to_bi
 use crate::paillier;
 use crate::paillier_zk;
 
+/// Verifies an ECDSA signature `(r, s)` against a public key and message digest.
 pub fn verify_signature(
     public_key: &Point<Secp256k1>,
     msg_digest: &[u8; 32],
@@ -31,6 +32,8 @@ pub fn recovery_id(r_point: &Point<Secp256k1>) -> u8 {
     bytes.as_bytes()[32] % 2
 }
 
+/// Encodes an ECDSA signature in Ethereum's 65-byte format.
+/// With a `chain_id`, applies EIP-155 replay protection.
 pub fn ethereum_signature(
     r_bytes: &[u8],
     s_bytes: &[u8],
@@ -48,6 +51,7 @@ pub fn ethereum_signature(
     sig
 }
 
+/// Encodes an ECDSA signature in Bitcoin's DER format.
 pub fn bitcoin_der_signature(r_bytes: &[u8], s_bytes: &[u8]) -> Vec<u8> {
     fn encode_int(bytes: &[u8]) -> Vec<u8> {
         let mut v = vec![];
@@ -155,6 +159,11 @@ fn bu2bi(u: &BigUint) -> BigInt {
     BigInt::from_biguint(num_bigint::Sign::Plus, u.clone())
 }
 
+/// Runs the 2-of-2 Lindell signing protocol. `signers` is the pair of party
+/// indexes that sign `msg_digest`; `share` and `public_key` come from
+/// [`run_dkg`]. Returns `(r, s, recovery_id)`.
+///
+/// [`run_dkg`]: crate::lindell::dkg::run_dkg
 #[allow(clippy::too_many_arguments)]
 pub async fn run_sign<M>(
     mut mpc: M,

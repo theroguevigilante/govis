@@ -5,6 +5,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Paillier public key. `n = p * q`, `n_sq = n^2`, `g` the generator.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPublicKey {
     pub n: BigUint,
@@ -12,12 +13,15 @@ pub struct PaillierPublicKey {
     pub g: BigUint,
 }
 
+/// Paillier private key. `lambda = lcm(p-1, q-1)`, `mu` the decryption
+/// coefficient.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PaillierPrivateKey {
     pub lambda: BigUint,
     pub mu: BigUint,
 }
 
+/// A freshly generated Paillier key pair.
 pub struct PaillierKeypair {
     pub pk: PaillierPublicKey,
     pub sk: PaillierPrivateKey,

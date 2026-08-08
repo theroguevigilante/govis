@@ -1,3 +1,5 @@
+//! TCP transport implementing the `round-based` Mpc trait.
+
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;

@@ -24,11 +24,14 @@ pub struct ShareMsg {
     pub share: SecretScalar<Secp256k1>,
 }
 
+/// Output of Lindell DKG / refresh: the party's secret share and the
+/// shared public key.
 pub struct LindellDkgOutput {
     pub secret_share: SecretScalar<Secp256k1>,
     pub public_key: Point<Secp256k1>,
 }
 
+/// Persistable Lindell key data.
 #[derive(Serialize, Deserialize)]
 pub struct LindellKeyData {
     pub protocol: String,

@@ -42,6 +42,10 @@ pub struct EncryptedKMsg {
     pub range_proof: Option<paillier_zk::RangeProof>,
 }
 
+/// Result of the offline phase, fed to [`run_online_sign`]. Contains the
+/// nonce `k`, its inverse, and the public `R = k*G` point.
+///
+/// [`run_online_sign`]: crate::cggmp21::sign::run_online_sign
 #[derive(Clone, Debug)]
 pub struct Presignature {
     pub k: Scalar<Secp256k1>,
@@ -74,6 +78,8 @@ pub enum Error<RecvErr, SendErr> {
 pub type ErrorM<M> =
     Error<CompleteRoundErr<M, round_based::round::RoundInputError>, <M as Mpc>::SendErr>;
 
+/// Offline phase: generates a presignature (nonce `k`, blinding shares and
+/// the public `R` point) for `signers` without knowing the message.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_presign<M, R>(
     mut mpc: M,

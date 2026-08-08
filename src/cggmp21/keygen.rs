@@ -51,6 +51,8 @@ pub enum Error<RecvErr, SendErr> {
 pub type ErrorM<M> =
     Error<CompleteRoundErr<M, round_based::round::RoundInputError>, <M as Mpc>::SendErr>;
 
+/// Runs CGGMP21 distributed key generation for party `i` out of `n`,
+/// threshold `t`. All parties must pass the same `sid`.
 pub async fn run_keygen<M, R>(
     mut mpc: M,
     i: u16,

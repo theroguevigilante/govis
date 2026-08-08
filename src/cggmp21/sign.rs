@@ -18,6 +18,7 @@ pub struct SignatureShareMsg {
     pub s_i: Vec<u8>,
 }
 
+/// A complete ECDSA signature with recovery id.
 #[derive(Debug)]
 pub struct Signature {
     pub r_bytes: Vec<u8>,

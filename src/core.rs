@@ -1,3 +1,6 @@
+//! Feldman VSS core: polynomial generation, share verification, and
+//! commitment computation shared by both protocols.
+
 use crate::types::{DkgShares, RefreshShares};
 use generic_ec::{Point, Scalar, SecretScalar, curves::Secp256k1};
 use num_bigint::{BigInt, BigUint};

@@ -1,3 +1,6 @@
+//! Zero-knowledge proofs for Paillier ciphertexts: range, multiplication,
+//! consistency, Schnorr, and discrete-log proofs.
+
 use generic_ec::{Point, Scalar, curves::Secp256k1};
 use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_integer::Integer;

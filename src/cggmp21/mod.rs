@@ -1,3 +1,10 @@
+//! CGGMP21 threshold ECDSA signing with arbitrary thresholds.
+//!
+//! - [`keygen`]: distributed key generation.
+//! - [`presign`]: offline generation of presignatures (nonce k and R).
+//! - [`sign`]: online signing from a presignature.
+//! - [`types`]: key data types.
+
 pub mod keygen;
 pub mod presign;
 pub mod sign;
