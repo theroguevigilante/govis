@@ -2,7 +2,7 @@
 
 ### Supported Versions
 
-The latest version of Govis is the only actively supported version.
+The latest version of govis is the only actively supported version.
 
 ### Reporting a Vulnerability
 

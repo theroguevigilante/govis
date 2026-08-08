@@ -1,4 +1,4 @@
-//! # Govis
+//! # govis
 //!
 //! Threshold ECDSA for secp256k1 with two protocols:
 //!
